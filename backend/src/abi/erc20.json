@@ -12,7 +12,7 @@
     "name": "decimals",
     "outputs": [{"name": "", "type": "uint8"}],
     "type": "function"
-  },e
+  },
   {
     "constant": true,
     "inputs": [],
