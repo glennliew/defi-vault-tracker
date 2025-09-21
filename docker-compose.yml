@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: vault_user
+      POSTGRES_PASSWORD: vault_pass
+      POSTGRES_DB: vault_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vault_user -d vault_tracker"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://vault_user:vault_pass@postgres:5432/vault_tracker
+      RPC_URL: ${RPC_URL:-https://mainnet.base.org}
+      VAULT_ADDRESS: ${VAULT_ADDRESS:-0x616a4E1db48e22028f6bbf20444Cd3b8e3273738}
+      USDC_ADDRESS: ${USDC_ADDRESS:-0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913}
+      NETWORK: ${NETWORK:-base}
+      MOCK_MODE: ${MOCK_MODE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm start
+
+volumes:
+  postgres_data:
