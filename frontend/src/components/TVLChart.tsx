@@ -25,7 +25,7 @@ export const TVLChart: React.FC<TVLChartProps> = ({ vaultAddress }) => {
         const now = new Date();
         const fromTime = new Date(now.getTime() - getTimeRangeMs(timeRange));
 
-        const response = await axios.get(`/api/v1/vaults/${vaultAddress}/tvl`, {
+        const response = await axios.get(`http://localhost:3001/api/v1/vaults/${vaultAddress}/tvl`, {
           params: {
             from: fromTime.toISOString(),
             to: now.toISOString(),
@@ -155,7 +155,7 @@ export const TVLChart: React.FC<TVLChartProps> = ({ vaultAddress }) => {
             fontSize={12}
           />
           <Tooltip
-            formatter={(value) => [formatTooltipValue(value), 'TVL (USDC)']}
+            formatter={(value: any) => formatTooltipValue(value)}
             labelFormatter={formatTooltipLabel}
             contentStyle={{
               backgroundColor: 'white',

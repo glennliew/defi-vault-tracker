@@ -21,7 +21,7 @@ export const TVLCard: React.FC<TVLCardProps> = ({ vaultAddress }) => {
     const fetchTVL = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/v1/vaults/${vaultAddress}/tvl/latest`);
+        const response = await axios.get(`http://localhost:3001/api/v1/vaults/${vaultAddress}/tvl/latest`);
         setTvlData(response.data);
         setError(null);
       } catch (err) {

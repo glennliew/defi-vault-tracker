@@ -64,14 +64,15 @@ export class VaultWatcher {
     }
   }
 
+  // Mock mode watcher
   private startMockWatcher() {
     let blockCounter = 0;
     const mockBlocks = [
       { block: this.mockBlockNumber, tvl: this.mockBaseTvl },
       { block: this.mockBlockNumber + 1, tvl: this.mockBaseTvl * 1.02 }, // +2%
       { block: this.mockBlockNumber + 2, tvl: this.mockBaseTvl * 1.01 }, // +1%
-      { block: this.mockBlockNumber + 3, tvl: this.mockBaseTvl * 0.75 }, // -25% DROP!
-      { block: this.mockBlockNumber + 4, tvl: this.mockBaseTvl * 0.50 }, // -50% SECOND DROP!
+      { block: this.mockBlockNumber + 3, tvl: this.mockBaseTvl * 0.75 }, // -25% drop!
+      { block: this.mockBlockNumber + 4, tvl: this.mockBaseTvl * 0.50 }, // -50% second drop!
       { block: this.mockBlockNumber + 5, tvl: this.mockBaseTvl * 0.48 }, // -52%
     ];
 

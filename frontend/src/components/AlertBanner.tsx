@@ -25,7 +25,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ vaultAddress }) => {
     const fetchAlerts = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/v1/vaults/${vaultAddress}/alerts?limit=5`);
+        const response = await axios.get(`http://localhost:3001/api/v1/vaults/${vaultAddress}/alerts?limit=5`);
         setAlerts(response.data.alerts);
       } catch (err) {
         console.error('Error fetching alerts:', err);
