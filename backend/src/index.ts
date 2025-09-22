@@ -25,49 +25,52 @@ app.get('/', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-// Initialize vault watcher
-const initializeWatcher = async () => {
-  const rpcUrl = process.env.RPC_WS_URL || process.env.RPC_URL;
-  const usdcAddress = process.env.USDC_ADDRESS;
-  const vaultAddress = process.env.VAULT_ADDRESS;
-  const network = process.env.NETWORK || 'base';
-  const mockMode = process.env.MOCK_MODE === 'true';
-
-  if (!rpcUrl || !usdcAddress || !vaultAddress) {
-    console.error('Missing required environment variables');
-    process.exit(1);
-  }
-
-  console.log('Configuration:');
-  console.log('- Network:', network);
-  console.log('- Vault:', vaultAddress);
-  console.log('- USDC:', usdcAddress);
-  console.log('- Mock Mode:', mockMode);
-  console.log('- RPC:', rpcUrl.includes('wss') ? 'WebSocket' : 'HTTP');
-
-  const watcher = new VaultWatcher(rpcUrl, usdcAddress, vaultAddress, network, mockMode);
-
-  try {
-    await watcher.start();
-  } catch (error) {
-    console.error('Failed to start watcher:', error);
-    process.exit(1);
-  }
-
-  // Graceful shutdown
-  process.on('SIGINT', async () => {
-    console.log('\nShutting down gracefully...');
-    await watcher.stop();
-    process.exit(0);
+// Only start server and watcher if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  // Start server
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
   });
-};
 
-// Start watcher after server starts
-setTimeout(initializeWatcher, 1000);
+  // Initialize vault watcher
+  const initializeWatcher = async () => {
+    const rpcUrl = process.env.RPC_WS_URL || process.env.RPC_URL;
+    const usdcAddress = process.env.USDC_ADDRESS;
+    const vaultAddress = process.env.VAULT_ADDRESS;
+    const network = process.env.NETWORK || 'base';
+    const mockMode = process.env.MOCK_MODE === 'true';
+
+    if (!rpcUrl || !usdcAddress || !vaultAddress) {
+      console.error('Missing required environment variables');
+      process.exit(1);
+    }
+
+    console.log('Configuration:');
+    console.log('- Network:', network);
+    console.log('- Vault:', vaultAddress);
+    console.log('- USDC:', usdcAddress);
+    console.log('- Mock Mode:', mockMode);
+    console.log('- RPC:', rpcUrl.includes('wss') ? 'WebSocket' : 'HTTP');
+
+    const watcher = new VaultWatcher(rpcUrl, usdcAddress, vaultAddress, network, mockMode);
+
+    try {
+      await watcher.start();
+    } catch (error) {
+      console.error('Failed to start watcher:', error);
+      process.exit(1);
+    }
+
+    // Graceful shutdown
+    process.on('SIGINT', async () => {
+      console.log('\nShutting down gracefully...');
+      await watcher.stop();
+      process.exit(0);
+    });
+  };
+
+  // Start watcher after server starts
+  setTimeout(initializeWatcher, 1000);
+}
 
 export default app;

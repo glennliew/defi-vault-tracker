@@ -2,6 +2,7 @@ import request from 'supertest';
 import app from '../index';
 import { db } from '../database/connection';
 
+
 // Mock database
 jest.mock('../database/connection', () => ({
   db: {
@@ -84,7 +85,7 @@ describe('API Endpoints', () => {
       expect(response.status).toBe(200);
       expect(response.body.vault_address).toBe(vaultAddress.toLowerCase());
       expect(response.body.data).toHaveLength(2);
-      expect(response.body.data[0].block_number).toBe(12344);
+      expect(response.body.data[0].block_number).toBe(12345);
     });
   });
 

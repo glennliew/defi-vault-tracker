@@ -26,9 +26,9 @@ describe('VaultWatcher', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (ethers.providers.WebSocketProvider as jest.Mock).mockImplementation(() => mockProvider);
-    (ethers.Contract as jest.Mock).mockImplementation(() => mockContract);
-    (ethers.utils.formatUnits as jest.Mock).mockImplementation((value, decimals) => '100000');
+    (ethers.providers.WebSocketProvider as unknown as jest.Mock).mockImplementation(() => mockProvider);
+    (ethers.Contract as unknown as jest.Mock).mockImplementation(() => mockContract);
+    (ethers.utils.formatUnits as unknown as jest.Mock).mockImplementation((value, decimals) => '100000');
     mockContract.decimals.mockResolvedValue(6);
   });
 
