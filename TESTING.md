@@ -48,7 +48,7 @@ The system includes a mock mode that simulates a vault drainage attack scenario 
 
 ### Mock Scenario Details
 
-The mock mode simulates the exact attack pattern described in the assignment:
+The mock mode simulates the exact attack pattern described:
 
 1. **Initial State**: $100,000 TVL
 2. **Normal Activity**: Small fluctuations (+2%, +1%)

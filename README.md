@@ -73,166 +73,109 @@ open http://localhost:3000
 
 5. **Access the application**: Open http://localhost:3000
 
-### Mock Mode Testing
+## Switching Between Mock and Live Modes
 
-To test TVL drop detection without waiting for real events:
+The system supports two operational modes for development and production use:
 
-1. Set `MOCK_MODE=true` in `.env`
-2. Restart backend - it will simulate a 25% drop after initial data
-3. Check frontend for alert banner
+### 🧪 **Mock Mode** (Development/Testing)
+Simulates vault drainage attacks for testing and demonstration.
 
-## Backend Design & Scalability
+**Features:**
+- Generates predictable TVL data sequence (100k → 75k → 50k → 48k)
+- Triggers alerts for 25% and 33% drops
+- No real network calls required
+- Perfect for demos and testing
 
-### Core Architecture
+**How to enable:**
+```bash
+# Edit your .env file
+MOCK_MODE=true
+# Remove or comment out RPC_URL (not needed in mock mode)
+# RPC_URL=https://your-rpc-url
 
-The backend follows a **modular, event-driven architecture** designed for reliable DeFi monitoring:
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   VaultWatcher  │───▶│  DatabaseLayer  │───▶│   REST API      │
-│   (Block Events)│    │  (PostgreSQL)   │    │   (Express)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │
-         ▼
-┌─────────────────┐    ┌─────────────────┐
-│   RPC Provider  │    │  Alert Engine   │
-│   (WebSocket)   │    │  (≥20% drops)   │
-└─────────────────┘    └─────────────────┘
+# Restart backend
+docker compose restart backend
 ```
 
-**Key Components:**
-- **VaultWatcher**: Block-by-block TVL monitoring service
-- **Database Layer**: Time-series data storage with proper indexing
-- **Alert Engine**: Real-time anomaly detection (≥20% single-block drops)
-- **REST API**: Clean endpoints for frontend consumption
-- **Mock Mode**: Deterministic testing with simulated drainage scenarios
-
-### Data Validity & Reliability
-
-**Block Confirmation Strategy:**
-- Alerts marked as `unconfirmed` initially
-- Confirmed after N blocks to handle chain reorganizations
-- Critical alerts (≥50% drops) get immediate notification + confirmation tracking
-
-**Data Integrity:**
-- TVL calculations use precise decimal arithmetic (BigNumber.js)
-- Block number indexing prevents duplicate processing
-- Graceful error handling with automatic retry mechanisms
-- Database constraints ensure data consistency
-
-### Scalability for 100+ Vaults
-
-**1. Efficient Data Collection**
-```typescript
-// Multicall batching for 100+ vaults
-const multicall = new ethers.Contract(MULTICALL_ADDRESS, MULTICALL_ABI, provider);
-const calls = vaults.map(vault => ({
-  target: USDC_ADDRESS,
-  callData: usdc.interface.encodeFunctionData('balanceOf', [vault.address])
-}));
-const results = await multicall.aggregate(calls);
+**Expected output:**
+```
+Configuration:
+- Mock Mode: true
+- RPC: Mock
+Starting vault watcher in MOCK MODE
+Mock block 1000000: TVL $100,000
+Mock block 1000003: TVL $75,000
+🚨 ALERT: TVL drop of 25.0% detected
 ```
 
-**2. Database Optimization**
-```sql
--- Partitioned tables by date for historical data
-CREATE TABLE tvl_points_2024_01 PARTITION OF tvl_points
-FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+### 🌐 **Live Mode** (Production)
+Monitors real Base network for actual vault activity.
 
--- Composite indexes for fast queries
-CREATE INDEX idx_vault_block ON tvl_points (vault_address, block_number DESC);
-CREATE INDEX idx_vault_time ON tvl_points (vault_address, recorded_at DESC);
+**Features:**
+- Real-time Base network monitoring
+- Actual TVL data from Seamless USDC Vault
+- HTTP polling every 12 seconds
+- Detects real vault drainage attacks
+
+**Requirements:**
+- Base network RPC provider (Alchemy, QuickNode, etc.)
+- Stable internet connection
+- Valid API key
+
+**How to enable:**
+```bash
+# Edit your .env file
+MOCK_MODE=false
+RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR-API-KEY
+
+# Restart backend
+docker compose restart backend
 ```
 
-**3. Horizontal Scaling Architecture**
+**Expected output:**
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Vault Group A │    │   Vault Group B │    │   Vault Group C │
-│   (Morpho)      │    │   (Aave)        │    │   (Compound)    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Shared PostgreSQL                            │
-│                  (Protocol-partitioned)                         │
-└─────────────────────────────────────────────────────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Unified REST API                           │
-│                    (Load Balanced)                              │
-└─────────────────────────────────────────────────────────────────┘
+Configuration:
+- Mock Mode: false
+- RPC: HTTP
+Starting vault watcher for 0x616a4e1db...
+Block 35872167: TVL $5.634
 ```
 
-**4. Performance Optimizations**
+### 🔄 **Quick Mode Switching**
 
-**RPC Efficiency:**
-- WebSocket connections for real-time block events
-- Connection pooling and automatic reconnection
-- Rate limiting with exponential backoff
-- Fallback RPC providers for redundancy
+**Mock → Live:**
+```bash
+# 1. Update environment
+sed -i '' 's/MOCK_MODE=true/MOCK_MODE=false/' .env
+sed -i '' 's/# RPC_URL=/RPC_URL=/' .env
 
-**Memory Management:**
-- Streaming data processing for large historical ranges
-- LRU cache for frequently accessed vault data
-- Periodic cleanup of old alert data
+# 2. Restart backend
+docker compose restart backend
 
-**Database Performance:**
-- Time-series data downsampling (1min → 1hr → 1day aggregates)
-- Automated partitioning by date ranges
-- Read replicas for analytical queries
-
-### Multi-Protocol Considerations
-
-**Protocol Abstraction:**
-```typescript
-interface VaultAdapter {
-  getTVL(blockNumber: number): Promise<BigNumber>;
-  getProtocol(): ProtocolType;
-  getUnderlyingAssets(): Token[];
-}
-
-class MorphoVaultAdapter implements VaultAdapter { /* ... */ }
-class AaveVaultAdapter implements VaultAdapter { /* ... */ }
-class CompoundVaultAdapter implements VaultAdapter { /* ... */ }
+# 3. Verify mode
+docker compose logs backend | grep "Mock Mode"
 ```
 
-**Configuration Management:**
-```yaml
-# vault-config.yml
-vaults:
-  - address: "0x616a4E1db..."
-    protocol: "morpho"
-    asset: "USDC"
-    network: "base"
-    alertThreshold: 0.20
-  - address: "0x742d35..."
-    protocol: "aave"
-    asset: "ETH"
-    network: "ethereum"
-    alertThreshold: 0.15
+**Live → Mock:**
+```bash
+# 1. Update environment
+sed -i '' 's/MOCK_MODE=false/MOCK_MODE=true/' .env
+
+# 2. Clear existing data (optional)
+docker compose exec postgres psql -U vault_user -d vault_tracker -c "DELETE FROM tvl_points; DELETE FROM alerts;"
+
+# 3. Restart backend
+docker compose restart backend
 ```
 
-**Alert Customization:**
-- Protocol-specific thresholds (stablecoins: 20%, volatile assets: 30%)
-- Multi-asset vault support with weighted TVL calculations
-- Cross-chain monitoring with network-specific optimizations
+### 🚨 **Important Notes**
 
-### Production Readiness
+**Before switching modes:**
+- Always restart the backend service after changing `MOCK_MODE`
+- Consider clearing database data when switching to avoid mixed data
+- Live mode requires a valid RPC_URL with sufficient rate limits
+- Mock mode generates the same sequence each time - clear data for fresh runs
 
-**Monitoring & Observability:**
-- Structured logging with correlation IDs
-- Prometheus metrics for system health
-- Grafana dashboards for TVL trends and alert patterns
-- Dead letter queues for failed alert processing
-
-**Security:**
-- Input validation and SQL injection protection
-- Rate limiting on API endpoints
-- Environment-based configuration management
-- Secrets management for RPC keys
-
-This architecture ensures the system can scale from 1 vault to 100+ vaults across multiple protocols while maintaining data integrity and real-time performance.
 
 ## API Endpoints
 
