@@ -20,7 +20,7 @@ A system that monitors Seamless USDC Vault on Base network, tracking TVL (Total 
 
 - Node.js 16+
 - PostgreSQL 12+
-- Base network RPC access (recommended: Alchemy, QuickNode)
+- Base network RPC access 
 
 ### Option 1: Docker Compose (Recommended)
 
@@ -81,12 +81,158 @@ To test TVL drop detection without waiting for real events:
 2. Restart backend - it will simulate a 25% drop after initial data
 3. Check frontend for alert banner
 
-## Scalability Considerations
+## Backend Design & Scalability
 
-- **Multiple Vaults**: Use multicall contracts to batch `balanceOf` calls for 100+ vaults
-- **Data Retention**: Implement downsampling (hourly averages) for historical data
-- **Reorg Handling**: Wait for block confirmations before finalizing alerts
-- **RPC Limits**: Use rate limiting and reliable providers for high-throughput monitoring
+### Core Architecture
+
+The backend follows a **modular, event-driven architecture** designed for reliable DeFi monitoring:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   VaultWatcher  │───▶│  DatabaseLayer  │───▶│   REST API      │
+│   (Block Events)│    │  (PostgreSQL)   │    │   (Express)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │
+         ▼
+┌─────────────────┐    ┌─────────────────┐
+│   RPC Provider  │    │  Alert Engine   │
+│   (WebSocket)   │    │  (≥20% drops)   │
+└─────────────────┘    └─────────────────┘
+```
+
+**Key Components:**
+- **VaultWatcher**: Block-by-block TVL monitoring service
+- **Database Layer**: Time-series data storage with proper indexing
+- **Alert Engine**: Real-time anomaly detection (≥20% single-block drops)
+- **REST API**: Clean endpoints for frontend consumption
+- **Mock Mode**: Deterministic testing with simulated drainage scenarios
+
+### Data Validity & Reliability
+
+**Block Confirmation Strategy:**
+- Alerts marked as `unconfirmed` initially
+- Confirmed after N blocks to handle chain reorganizations
+- Critical alerts (≥50% drops) get immediate notification + confirmation tracking
+
+**Data Integrity:**
+- TVL calculations use precise decimal arithmetic (BigNumber.js)
+- Block number indexing prevents duplicate processing
+- Graceful error handling with automatic retry mechanisms
+- Database constraints ensure data consistency
+
+### Scalability for 100+ Vaults
+
+**1. Efficient Data Collection**
+```typescript
+// Multicall batching for 100+ vaults
+const multicall = new ethers.Contract(MULTICALL_ADDRESS, MULTICALL_ABI, provider);
+const calls = vaults.map(vault => ({
+  target: USDC_ADDRESS,
+  callData: usdc.interface.encodeFunctionData('balanceOf', [vault.address])
+}));
+const results = await multicall.aggregate(calls);
+```
+
+**2. Database Optimization**
+```sql
+-- Partitioned tables by date for historical data
+CREATE TABLE tvl_points_2024_01 PARTITION OF tvl_points
+FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+-- Composite indexes for fast queries
+CREATE INDEX idx_vault_block ON tvl_points (vault_address, block_number DESC);
+CREATE INDEX idx_vault_time ON tvl_points (vault_address, recorded_at DESC);
+```
+
+**3. Horizontal Scaling Architecture**
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Vault Group A │    │   Vault Group B │    │   Vault Group C │
+│   (Morpho)      │    │   (Aave)        │    │   (Compound)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Shared PostgreSQL                            │
+│                  (Protocol-partitioned)                         │
+└─────────────────────────────────────────────────────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Unified REST API                           │
+│                    (Load Balanced)                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**4. Performance Optimizations**
+
+**RPC Efficiency:**
+- WebSocket connections for real-time block events
+- Connection pooling and automatic reconnection
+- Rate limiting with exponential backoff
+- Fallback RPC providers for redundancy
+
+**Memory Management:**
+- Streaming data processing for large historical ranges
+- LRU cache for frequently accessed vault data
+- Periodic cleanup of old alert data
+
+**Database Performance:**
+- Time-series data downsampling (1min → 1hr → 1day aggregates)
+- Automated partitioning by date ranges
+- Read replicas for analytical queries
+
+### Multi-Protocol Considerations
+
+**Protocol Abstraction:**
+```typescript
+interface VaultAdapter {
+  getTVL(blockNumber: number): Promise<BigNumber>;
+  getProtocol(): ProtocolType;
+  getUnderlyingAssets(): Token[];
+}
+
+class MorphoVaultAdapter implements VaultAdapter { /* ... */ }
+class AaveVaultAdapter implements VaultAdapter { /* ... */ }
+class CompoundVaultAdapter implements VaultAdapter { /* ... */ }
+```
+
+**Configuration Management:**
+```yaml
+# vault-config.yml
+vaults:
+  - address: "0x616a4E1db..."
+    protocol: "morpho"
+    asset: "USDC"
+    network: "base"
+    alertThreshold: 0.20
+  - address: "0x742d35..."
+    protocol: "aave"
+    asset: "ETH"
+    network: "ethereum"
+    alertThreshold: 0.15
+```
+
+**Alert Customization:**
+- Protocol-specific thresholds (stablecoins: 20%, volatile assets: 30%)
+- Multi-asset vault support with weighted TVL calculations
+- Cross-chain monitoring with network-specific optimizations
+
+### Production Readiness
+
+**Monitoring & Observability:**
+- Structured logging with correlation IDs
+- Prometheus metrics for system health
+- Grafana dashboards for TVL trends and alert patterns
+- Dead letter queues for failed alert processing
+
+**Security:**
+- Input validation and SQL injection protection
+- Rate limiting on API endpoints
+- Environment-based configuration management
+- Secrets management for RPC keys
+
+This architecture ensures the system can scale from 1 vault to 100+ vaults across multiple protocols while maintaining data integrity and real-time performance.
 
 ## API Endpoints
 

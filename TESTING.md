@@ -71,6 +71,44 @@ The mock mode simulates the exact attack pattern described in the assignment:
    - Chart shows dramatic TVL drops
    - Multiple alerts are displayed
 
+### How to Restart Mock Simulation
+
+To rerun the mock simulation and see fresh vault drainage data:
+
+#### Quick Restart (Recommended)
+```bash
+# Step 1: Clear existing data
+docker compose exec postgres psql -U vault_user -d vault_tracker -c "DELETE FROM tvl_points; DELETE FROM alerts;"
+
+# Step 2: Restart backend service
+docker compose restart backend
+```
+
+#### Full System Reset (Alternative)
+```bash
+# Stop all services
+docker compose down
+
+# Start services fresh
+docker compose up -d
+
+# Verify database tables (if needed)
+docker compose exec backend npm run db:migrate
+```
+
+**What happens after restart:**
+- ✅ All previous TVL data and alerts are cleared
+- ✅ Mock simulation starts from beginning (100k TVL)
+- ✅ Fresh vault drainage scenario runs (100k → 75k → 50k → 48k)
+- ✅ New alerts generated for TVL drops ≥20%
+- ✅ Live data updates visible in frontend dashboard
+
+**When to use:**
+- Testing the complete drainage detection flow
+- Demonstrating the system to stakeholders
+- Clearing old test data before new demos
+- Verifying alert timing and accuracy
+
 ### API Testing
 
 You can also test the mock data via API:

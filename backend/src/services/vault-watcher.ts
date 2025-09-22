@@ -24,10 +24,10 @@ export class VaultWatcher {
     this.mockMode = mockMode;
 
     if (!mockMode) {
-      // Try WebSocket first, fallback to HTTP
-      try {
+      // Use appropriate provider based on URL scheme
+      if (rpcUrl.startsWith('wss://') || rpcUrl.startsWith('ws://')) {
         this.provider = new ethers.providers.WebSocketProvider(rpcUrl);
-      } catch {
+      } else {
         this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
       }
       this.usdcContract = new ethers.Contract(usdcAddress, ERC20_ABI, this.provider);
