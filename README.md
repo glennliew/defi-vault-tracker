@@ -1,4 +1,4 @@
-# DeFi Vault Tracker - Axal Take-Home Assignment
+# DeFi Vault Tracker 
 
 A system that monitors Seamless USDC Vault on Base network, tracking TVL (Total Value Locked) and detecting potential vault drainage attacks.
 
